@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from ..mongo_utils import get_db_handle
 from datetime import datetime
 from bson import ObjectId
-from django.contrib.auth.models import User
+from ..models import Customer
 
 class ReviewList(APIView):
     # API view to manage Reviews using MongoDB
@@ -21,15 +21,15 @@ class ReviewList(APIView):
         # Convert ObjectId to string for JSON serialization
         reviews = list(collection.find(filter_query))
         
-        # Enrich with User data from SQL
-        user_ids = [review.get('user_id') for review in reviews if review.get('user_id')]
-        users = User.objects.filter(id__in=user_ids).values('id', 'username')
-        user_map = {user['id']: user['username'] for user in users}
+        # Enrich with Customer data from SQL
+        customer_ids = [review.get('customer_id') for review in reviews if review.get('customer_id')]
+        customers = Customer.objects.filter(id__in=customer_ids).values('id', 'name')
+        customer_map = {customer['id']: customer['name'] for customer in customers}
 
         for review in reviews:
             review['_id'] = str(review['_id'])
-            user_id = review.get('user_id')
-            review['username'] = user_map.get(user_id, "Unknown User")
+            customer_id = review.get('customer_id')
+            review['customer_name'] = customer_map.get(customer_id, "Unknown Customer")
             
         return response.Response(reviews)
 
@@ -38,7 +38,7 @@ class ReviewList(APIView):
         # Sample Data:
         # {
         #     "product_id": 1,
-        #     "user_id": 1,
+        #     "customer_id": 1,
         #     "rating": 5,
         #     "comment": "Great product!"
         # }
@@ -48,7 +48,7 @@ class ReviewList(APIView):
         data = request.data
         review = {
             'product_id': data.get('product_id'),
-            'user_id': data.get('user_id'),
+            'customer_id': data.get('customer_id'),
             'rating': data.get('rating'),
             'comment': data.get('comment'),
             'created_at': datetime.now().isoformat()
@@ -86,7 +86,7 @@ class ReviewDetail(APIView):
             return response.Response(status=status.HTTP_404_NOT_FOUND)
 
         data = request.data
-        update_data = {k: v for k, v in data.items() if k in ['rating', 'comment', 'product_id', 'user_id']}
+        update_data = {k: v for k, v in data.items() if k in ['rating', 'comment', 'product_id', 'customer_id']}
         update_data['updated_at'] = datetime.now().isoformat()
         
         collection.update_one({'_id': ObjectId(pk)}, {'$set': update_data})
@@ -104,3 +104,4 @@ class ReviewDetail(APIView):
         if result.deleted_count > 0:
             return response.Response(status=status.HTTP_204_NO_CONTENT)
         return response.Response(status=status.HTTP_404_NOT_FOUND)
+
